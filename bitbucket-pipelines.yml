@@ -1,0 +1,42 @@
+# Uses official Cypress docker image for dependencies
+# https://docs.cypress.io/guides/continuous-integration/introduction#Official-Cypress-Docker-Images
+image: cypress/base:14.16.0
+test: &test
+  name: Cypress Tests
+  caches:
+    - node
+    - cypress
+  script:
+    # Starts web server for E2E tests - replace with your own server invocation
+    # https://docs.cypress.io/guides/continuous-integration/introduction#Boot-your-server
+    - npm start &
+    - npx wait-on 'http-get://localhost:3000' # Waits for above
+      # Records to Cypress Cloud 
+      # https://docs.cypress.io/guides/cloud/projects#Set-up-a-project-to-record
+      # For recording and parallelization to work you must set your CYPRESS_RECORD_KEY
+      # in your Bitbucket repo → Repository Settings → Pipelines/Repository Variables
+    - npx cypress run --record --parallel --ci-build-id $BITBUCKET_BUILD_NUMBER
+pipelines:
+  default:
+    - step:
+        name: Install dependencies
+        # Uses built-in Bitbucket caching mechanism for dependencies
+        # https://docs.cypress.io/guides/continuous-integration/introduction#Caching
+        caches:
+          - npm
+          - cypress
+          - node
+        script:
+          - npm ci --prefer-offline
+    # Runs jobs in parallel
+    # https://docs.cypress.io/guides/guides/parallelization
+    - parallel:
+        # Uses 2 parallel instances
+        - step:
+            <<: *test
+        - step:
+            <<: *test
+definitions:
+  caches:
+    npm: $HOME/.npm
+    cypress: $HOME/.cache/Cypress
